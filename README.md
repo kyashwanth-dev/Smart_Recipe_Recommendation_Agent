@@ -7,6 +7,28 @@ This project provides a lightweight recommendation system that suggests recipes 
 - Scores dishes by ingredient overlap (match ratio)
 - Returns top recipe suggestions with matched and missing ingredients
 
+## Building and implementation flow (step-by-step)
+1. **Prepare recipe dataset**  
+   Create a JSON file (`data/dishes.json`) where each recipe has a `name` and an `ingredients` list.
+2. **Collect user ingredients**  
+   Accept available ingredients from the CLI using `--ingredients` as a comma-separated list.
+3. **Normalize inputs**  
+   Convert ingredient text to lowercase and trim spaces so comparisons are consistent.
+4. **Load and parse dishes**  
+   Read the dataset and convert each valid entry into a structured dish object.
+5. **Match ingredients**  
+   For each dish, compute:
+   - matched ingredients (`required ∩ available`)
+   - missing ingredients (`required - available`)
+6. **Score each dish**  
+   Calculate `match_ratio = matched_count / total_required_count`.
+7. **Filter low matches**  
+   Keep only dishes meeting the minimum threshold (`--min-match`).
+8. **Rank recommendations**  
+   Sort dishes by highest match ratio and return only top results (`--top`).
+9. **Show final output**  
+   Print recipe name, match percentage, matched ingredients, and missing ingredients.
+
 ## Project structure
 - `/home/runner/work/Smart_Recipe_Recommendation_Agent/Smart_Recipe_Recommendation_Agent/recipe_recommender.py` – recommendation logic and CLI
 - `/home/runner/work/Smart_Recipe_Recommendation_Agent/Smart_Recipe_Recommendation_Agent/data/dishes.json` – sample dish dataset
