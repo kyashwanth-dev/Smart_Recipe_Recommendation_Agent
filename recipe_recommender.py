@@ -1,98 +1,85 @@
-"""Simple logic-matching recipe recommendation engine."""
+"""AI-powered recipe recommendation client using a free Hugging Face model."""
 
 from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Iterable, List
+import os
+from typing import Any
+from urllib import error, request
+
+DEFAULT_MODEL = "google/flan-t5-large"
+HF_API_URL = "https://api-inference.huggingface.co/models/{model}"
 
 
-@dataclass(frozen=True)
-class Dish:
-    """Dish definition with required ingredients."""
-
-    name: str
-    ingredients: List[str]
-
-
-@dataclass(frozen=True)
-class Recommendation:
-    """Recommendation output for a dish match."""
-
-    dish: str
-    match_ratio: float
-    matched_ingredients: List[str]
-    missing_ingredients: List[str]
+def _build_prompt(user_request: str) -> str:
+    return (
+        "You are a recipe assistant. "
+        "Give 3 practical recipe suggestions with short steps and required ingredients.\n"
+        f"User request: {user_request.strip()}"
+    )
 
 
-def _normalize(ingredients: Iterable[str]) -> set[str]:
-    return {item.strip().lower() for item in ingredients if item and item.strip()}
+def _extract_generated_text(response_payload: Any) -> str:
+    if isinstance(response_payload, list) and response_payload:
+        first = response_payload[0]
+        if isinstance(first, dict):
+            text = first.get("generated_text")
+            if isinstance(text, str):
+                return text.strip()
+
+    if isinstance(response_payload, dict):
+        if isinstance(response_payload.get("generated_text"), str):
+            return response_payload["generated_text"].strip()
+        if isinstance(response_payload.get("error"), str):
+            raise RuntimeError(response_payload["error"])
+
+    raise RuntimeError("Unexpected response format from AI model.")
 
 
-def load_dishes(dataset_path: Path) -> list[Dish]:
-    """Load dish dataset from a JSON file."""
+def query_model(user_request: str, model: str, timeout: int = 90) -> str:
+    payload = {"inputs": _build_prompt(user_request), "options": {"wait_for_model": True}}
+    data = json.dumps(payload).encode("utf-8")
 
-    with dataset_path.open("r", encoding="utf-8") as file:
-        data = json.load(file)
+    headers = {"Content-Type": "application/json"}
+    hf_token = os.getenv("HF_TOKEN")
+    if hf_token:
+        headers["Authorization"] = "Bearer " + hf_token
 
-    dishes: list[Dish] = []
-    for entry in data:
-        ingredients = [ingredient.strip().lower() for ingredient in entry.get("ingredients", []) if ingredient]
-        if entry.get("name") and ingredients:
-            dishes.append(Dish(name=entry["name"], ingredients=ingredients))
-    return dishes
+    req = request.Request(
+        url=HF_API_URL.format(model=model),
+        data=data,
+        headers=headers,
+        method="POST",
+    )
 
+    try:
+        with request.urlopen(req, timeout=timeout) as response:
+            response_data = json.loads(response.read().decode("utf-8"))
+    except error.HTTPError as exc:
+        message = exc.read().decode("utf-8", errors="ignore")
+        raise RuntimeError(f"Model request failed ({exc.code}): {message}") from exc
+    except error.URLError as exc:
+        raise RuntimeError(f"Could not reach model API: {exc.reason}") from exc
 
-def recommend_recipes(
-    available_ingredients: Iterable[str],
-    dishes: Iterable[Dish],
-    top_n: int = 5,
-    min_match_ratio: float = 0.4,
-) -> list[Recommendation]:
-    """Recommend recipes by matching available ingredients with dish ingredients."""
-
-    available = _normalize(available_ingredients)
-    recommendations: list[Recommendation] = []
-
-    for dish in dishes:
-        required = _normalize(dish.ingredients)
-        if not required:
-            continue
-
-        matched = sorted(required & available)
-        missing = sorted(required - available)
-        match_ratio = len(matched) / len(required)
-
-        if match_ratio >= min_match_ratio:
-            recommendations.append(
-                Recommendation(
-                    dish=dish.name,
-                    match_ratio=round(match_ratio, 2),
-                    matched_ingredients=matched,
-                    missing_ingredients=missing,
-                )
-            )
-
-    recommendations.sort(key=lambda item: (item.match_ratio, len(item.matched_ingredients)), reverse=True)
-    return recommendations[:top_n]
+    return _extract_generated_text(response_data)
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Recommend recipes from available ingredients.")
+    parser = argparse.ArgumentParser(description="Get recipe suggestions from a free AI model.")
+    parser.add_argument(
+        "--request",
+        help="Direct request to send to the AI model.",
+    )
     parser.add_argument(
         "--ingredients",
-        required=True,
-        help="Comma-separated list of available ingredients (e.g. 'tomato,onion,garlic').",
+        help="Comma-separated ingredients to convert into an AI request.",
     )
     parser.add_argument(
-        "--dataset",
-        default="data/dishes.json",
-        help="Path to dish dataset JSON file.",
+        "--model",
+        default=DEFAULT_MODEL,
+        help=f"Hugging Face model ID (default: {DEFAULT_MODEL}).",
     )
-    parser.add_argument("--top", type=int, default=5, help="Maximum number of recommendations.")
-    parser.add_argument("--min-match", type=float, default=0.4, help="Minimum match ratio required.")
     return parser
 
 
@@ -100,20 +87,26 @@ def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
 
-    dishes = load_dishes(Path(args.dataset))
-    ingredients = args.ingredients.split(",")
-    recommendations = recommend_recipes(ingredients, dishes, top_n=args.top, min_match_ratio=args.min_match)
-
-    if not recommendations:
-        print("No recipes matched the provided ingredients.")
+    if not args.request and not args.ingredients:
+        parser.error("Provide either --request or --ingredients.")
         return
 
-    print("Recommended recipes:")
-    for item in recommendations:
-        print(f"- {item.dish} (match: {item.match_ratio:.0%})")
-        print(f"  Matched: {', '.join(item.matched_ingredients)}")
-        if item.missing_ingredients:
-            print(f"  Missing: {', '.join(item.missing_ingredients)}")
+    user_request = args.request
+    if not user_request:
+        normalized_ingredients = ",".join(part.strip() for part in args.ingredients.split(",") if part.strip())
+        user_request = (
+            "Suggest recipes I can make with these ingredients: "
+            f"{normalized_ingredients}. Keep the response concise."
+        )
+
+    try:
+        response_text = query_model(user_request=user_request, model=args.model)
+    except RuntimeError as exc:
+        print(f"Error: {exc}")
+        return
+
+    print("AI recipe recommendations:")
+    print(response_text)
 
 
 if __name__ == "__main__":

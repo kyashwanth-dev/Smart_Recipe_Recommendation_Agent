@@ -1,58 +1,49 @@
 # Smart Recipe Recommendation Agent
 
-This project provides a lightweight recommendation system that suggests recipes from available ingredients using logic-matching techniques.
+This project provides a lightweight AI-powered recommendation system that sends your request to a free Hugging Face model and returns recipe suggestions.
 
 ## What it does
-- Compares user-provided ingredients against a dish dataset
-- Scores dishes by ingredient overlap (match ratio)
-- Returns top recipe suggestions with matched and missing ingredients
+- Sends your prompt (or ingredient list) to a free AI model
+- Gets recipe recommendations in natural language
+- Supports choosing a different Hugging Face model from CLI
 
 ## Building and implementation flow (step-by-step)
-1. **Prepare recipe dataset**  
-   Create a JSON file (`data/dishes.json`) where each recipe has a `name` and an `ingredients` list.
-2. **Collect user ingredients**  
-   Accept available ingredients from the CLI using `--ingredients` as a comma-separated list.
-3. **Normalize inputs**  
-   Convert ingredient text to lowercase and trim spaces so comparisons are consistent.
-4. **Load and parse dishes**  
-   Read the dataset and convert each valid entry into a structured dish object.
-5. **Match ingredients**  
-   For each dish, compute:
-   - matched ingredients (`required ∩ available`)
-   - missing ingredients (`required - available`)
-6. **Score each dish**  
-   Calculate `match_ratio = matched_count / total_required_count`.
-7. **Filter low matches**  
-   Keep only dishes meeting the minimum threshold (`--min-match`).
-8. **Rank recommendations**  
-   Sort dishes by highest match ratio and return only top results (`--top`).
-9. **Show final output**  
-   Print recipe name, match percentage, matched ingredients, and missing ingredients.
+1. **Collect request input**  
+   Accept either a direct prompt (`--request`) or a comma-separated ingredient list (`--ingredients`).
+2. **Build AI prompt**  
+   Convert input into a clear recipe request prompt for the model.
+3. **Call Hugging Face Inference API**  
+   Send the prompt to `https://api-inference.huggingface.co/models/{model}`.
+4. **Authenticate optionally**  
+   If `HF_TOKEN` is set, include it in the request header for better reliability/rate limits.
+5. **Parse model response**  
+   Extract generated text from the API response.
+6. **Print final recommendation text**  
+   Display the AI response directly in the terminal.
 
 ## Project structure
 - `/home/runner/work/Smart_Recipe_Recommendation_Agent/Smart_Recipe_Recommendation_Agent/recipe_recommender.py` – recommendation logic and CLI
-- `/home/runner/work/Smart_Recipe_Recommendation_Agent/Smart_Recipe_Recommendation_Agent/data/dishes.json` – sample dish dataset
 
 ## Run
 From `/home/runner/work/Smart_Recipe_Recommendation_Agent/Smart_Recipe_Recommendation_Agent`:
 
 ```bash
-python recipe_recommender.py --ingredients "tomato,onion,garlic,olive oil,salt"
+python recipe_recommender.py --request "I have tomato, onion, garlic. Suggest dinner ideas."
 ```
 
 Optional arguments:
-- `--dataset` custom dataset path
-- `--top` number of recommendations (default: 5)
-- `--min-match` minimum match ratio (default: 0.4)
+- `--ingredients` comma-separated ingredients (alternative to `--request`)
+- `--model` custom Hugging Face model ID (default: `google/flan-t5-large`)
+
+Optional env var:
+- `HF_TOKEN` Hugging Face access token (recommended for stable API access)
 
 ## Example output
 ```text
-Recommended recipes:
-- Tomato Pasta (match: 100%)
-  Matched: garlic, olive oil, pasta, salt, tomato
-- Veg Omelette (match: 60%)
-  Matched: onion, salt, tomato
-  Missing: eggs, pepper
+AI recipe recommendations:
+1) Tomato Garlic Pasta ...
+2) Shakshuka ...
+3) Roasted Tomato Soup ...
 ```
 
-This matching approach is directly applicable to recommendation engines and data-matching pipelines.
+This approach is directly applicable to AI-powered recommendation assistants.
