@@ -1,58 +1,25 @@
-# Smart Recipe Recommendation Agent
+# ChefAI
 
-This project provides a lightweight recommendation system that suggests recipes from available ingredients using logic-matching techniques.
+ChefAI is a full-stack-ready recipe intelligence workspace that turns the ingredients in your kitchen into achievable, personalized meals.
 
-## What it does
-- Compares user-provided ingredients against a dish dataset
-- Scores dishes by ingredient overlap (match ratio)
-- Returns top recipe suggestions with matched and missing ingredients
+## Included
 
-## Building and implementation flow (step-by-step)
-1. **Prepare recipe dataset**  
-   Create a JSON file (`data/dishes.json`) where each recipe has a `name` and an `ingredients` list.
-2. **Collect user ingredients**  
-   Accept available ingredients from the CLI using `--ingredients` as a comma-separated list.
-3. **Normalize inputs**  
-   Convert ingredient text to lowercase and trim spaces so comparisons are consistent.
-4. **Load and parse dishes**  
-   Read the dataset and convert each valid entry into a structured dish object.
-5. **Match ingredients**  
-   For each dish, compute:
-   - matched ingredients (`required ∩ available`)
-   - missing ingredients (`required - available`)
-6. **Score each dish**  
-   Calculate `match_ratio = matched_count / total_required_count`.
-7. **Filter low matches**  
-   Keep only dishes meeting the minimum threshold (`--min-match`).
-8. **Rank recommendations**  
-   Sort dishes by highest match ratio and return only top results (`--top`).
-9. **Show final output**  
-   Print recipe name, match percentage, matched ingredients, and missing ingredients.
+- Responsive dashboard UI with ingredient search, voice capture affordance, fridge scan affordance, dietary filters, AI recommendations, nutrition panel, saved recipes, and assistant launcher.
+- Typed recipe domain models and Zod response validation.
+- Gemini prompt builder and `/api/recipes` route using the official `@google/genai` interactions API, with a credential-free demo mode.
+- Supabase schema for recipes, meal plans, and shopping lists.
+- Visual system built with Next.js App Router, TypeScript, CSS, Lucide, Framer Motion-ready structure, and Recharts-ready data.
 
-## Project structure
-- `/home/runner/work/Smart_Recipe_Recommendation_Agent/Smart_Recipe_Recommendation_Agent/recipe_recommender.py` – recommendation logic and CLI
-- `/home/runner/work/Smart_Recipe_Recommendation_Agent/Smart_Recipe_Recommendation_Agent/data/dishes.json` – sample dish dataset
-
-## Run
-From `/home/runner/work/Smart_Recipe_Recommendation_Agent/Smart_Recipe_Recommendation_Agent`:
+## Run locally
 
 ```bash
-python recipe_recommender.py --ingredients "tomato,onion,garlic,olive oil,salt"
+npm install
+cp .env.example .env.local
+npm run dev
 ```
 
-Optional arguments:
-- `--dataset` custom dataset path
-- `--top` number of recommendations (default: 5)
-- `--min-match` minimum match ratio (default: 0.4)
+Open http://localhost:3000. The dashboard works without credentials using local demo data. Add `GEMINI_API_KEY` to enable live generation through `ai.interactions.create(...)`; `GEMINI_MODEL` defaults to `gemini-3.8-flash` and can be overridden in `.env.local`. Clerk middleware and Supabase client initialization can be added when project credentials are available.
 
-## Example output
-```text
-Recommended recipes:
-- Tomato Pasta (match: 100%)
-  Matched: garlic, olive oil, pasta, salt, tomato
-- Veg Omelette (match: 60%)
-  Matched: onion, salt, tomato
-  Missing: eggs, pepper
-```
+## Deployment
 
-This matching approach is directly applicable to recommendation engines and data-matching pipelines.
+Import the repository into Vercel, add the values from `.env.example`, and deploy. Run `supabase/schema.sql` in the Supabase SQL editor, then add Clerk's Next.js middleware and RLS policies for your production user model.
